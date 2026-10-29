@@ -11,19 +11,15 @@ pub const SESSION_COOKIE: &str = "session";
 
 const IDLE_LIMIT: &str = "time::now() - duration::from::mins(settings:main.idle_timeout_minutes)";
 
-/// Zalogowany użytkownik. Użycie jako argumentu handlera wymusza ważną sesję
-/// i przedłuża ją (last_seen), a sesja nieaktywna dłużej niż idle_timeout_minutes jest usuwana.
 pub struct CurrentUser {
     pub id: RecordId,
     pub session_id: RecordId,
     pub username: String,
     pub role: Role,
-    /// hasło jednorazowe albo wygasłe (starsze niż password_valid_days)
     pub must_change_password: bool,
 }
 
 impl CurrentUser {
-    /// Dopóki hasło jednorazowe nie zostanie zmienione, żadne uprawnienie nie działa.
     pub fn require(&self, permission: Permission) -> Result<(), AppError> {
         if self.must_change_password {
             return Err(AppError::PasswordChangeRequired);
@@ -79,7 +75,7 @@ impl FromRequestParts<AppState> for CurrentUser {
 }
 
 pub fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
-    // bez Max-Age: ciasteczko znika po zamknięciu przeglądarki, a o wygaśnięciu i tak decyduje serwer
+    // bez Max-Age, wygaśnięcie i tak sprawdza serwer
     Cookie::build((SESSION_COOKIE, token))
         .path("/")
         .http_only(true)
@@ -100,7 +96,6 @@ pub async fn delete_session(db: &Db, token: &str) -> surrealdb::Result<()> {
     Ok(())
 }
 
-/// Co minutę usuwa sesje, które wygasły z powodu bezczynności.
 pub async fn purge_expired_sessions(db: Db) {
     let mut tick = tokio::time::interval(Duration::from_secs(60));
     loop {

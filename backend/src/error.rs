@@ -3,12 +3,10 @@ use serde_json::json;
 
 #[derive(Debug)]
 pub enum AppError {
-    /// Zły login, złe hasło i zablokowane konto dają tę samą odpowiedź.
     InvalidCredentials,
     OneTimePasswordExpired,
     Unauthorized,
     Forbidden,
-    /// Konto z hasłem jednorazowym lub wygasłym może tylko zmienić hasło.
     PasswordChangeRequired,
     NotFound,
     BadRequest(&'static str),
@@ -34,7 +32,6 @@ impl IntoResponse for AppError {
     }
 }
 
-// szczegóły błędów wewnętrznych trafiają tylko do logu, nie do klienta
 impl From<surrealdb::Error> for AppError {
     fn from(e: surrealdb::Error) -> Self {
         eprintln!("błąd bazy: {e}");

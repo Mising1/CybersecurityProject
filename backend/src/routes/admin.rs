@@ -35,11 +35,9 @@ async fn list_users(State(state): State<AppState>, user: CurrentUser) -> Result<
 #[derive(Deserialize)]
 struct NewUser { username: String, role: Role }
 
-/// Hasło jednorazowe w jawnej postaci - odpowiedź jest jedynym miejscem, gdzie się pojawia.
 #[derive(Serialize)]
 struct OneTimePassword { username: String, one_time_password: String, expires_at: String }
 
-/// Zwraca hasło jednorazowe i jego skrót.
 async fn generate_one_time_password() -> Result<(String, String), AppError> {
     let password = security::one_time_password();
     let to_hash = password.clone();
@@ -94,7 +92,6 @@ async fn set_blocked(
     if ids.is_empty() {
         return Err(AppError::NotFound);
     }
-    // zablokowany użytkownik traci od razu wszystkie sesje
     if req.blocked {
         state.db.query("DELETE session WHERE user IN $ids").bind(("ids", ids)).await?.check()?;
     }
@@ -121,7 +118,6 @@ async fn get_settings(State(state): State<AppState>, user: CurrentUser) -> Resul
     Ok(Json(db::settings(&state.db).await?))
 }
 
-/// Minimalna długość (15) i ważność hasła jednorazowego (48 h) są stałe - wynikają z wymagań.
 #[derive(Deserialize)]
 struct SettingsUpdate { passphrase_rule_enabled: bool, password_valid_days: u32, idle_timeout_minutes: u32 }
 
@@ -150,7 +146,7 @@ async fn update_settings(
     Ok(Json(db::settings(&state.db).await?))
 }
 
-/// Własnego konta i konta ADMIN nie można zablokować, usunąć ani zmienić im roli - inaczej system mógłby zostać bez administratora.
+// nie można zablokować, usunąć ani zmienić roli sobie ani kontu ADMIN - system nie może zostać bez admina
 fn protect(user: &CurrentUser, username: &str, own: &'static str, builtin: &'static str) -> Result<(), AppError> {
     if username == user.username {
         return Err(AppError::BadRequest(own));

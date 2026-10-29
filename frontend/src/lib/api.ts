@@ -13,7 +13,6 @@ export type Me = {
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
 let idleTimeoutMs = 0;
 
-/** Serwer liczy bezczynność od ostatniego zapytania do API, więc licznik resetuje każde zapytanie. */
 function resetIdleTimer() {
   if (!idleTimeoutMs) return;
   clearTimeout(idleTimer);
@@ -23,7 +22,6 @@ function resetIdleTimer() {
   }, idleTimeoutMs);
 }
 
-/** Zapytanie do backendu. Gdy sesja wygasła, przekierowuje na /login. */
 export async function api(path: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(`/api${path}`, {
     ...init,
@@ -44,7 +42,6 @@ export async function errorMessage(res: Response): Promise<string> {
 
 export type PasswordPolicy = { min_length: number; passphrase_rule_enabled: boolean };
 
-/** Zalogowany użytkownik. Konto z hasłem jednorazowym trafia na stronę zmiany hasła. */
 export async function currentUser(): Promise<Me> {
   const me: Me = await (await api("/auth/me")).json();
   idleTimeoutMs = me.idle_timeout_minutes * 60_000;
@@ -56,7 +53,6 @@ export async function currentUser(): Promise<Me> {
   return me;
 }
 
-/** Uzupełnia pasek górny z Layout.astro. Przy wymuszonej zmianie hasła nawigacja jest ukryta. */
 export function renderHeader(me: Me) {
   document.getElementById("who")!.textContent = `${me.username} · ${me.role}`;
   document.getElementById("admin-link")!.hidden = !me.permissions.includes("manage_users");

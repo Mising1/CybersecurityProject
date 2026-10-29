@@ -5,15 +5,12 @@ use crate::{config::Config, error::AppError, rbac::Role, security::{self, Passwo
 
 pub type Db = Surreal<Client>;
 
-/// Wbudowane konto administratora - zakładane przy starcie, nie da się go zablokować.
 pub const ADMIN_USERNAME: &str = "ADMIN";
 
-/// Ile ostatnich haseł użytkownika nie można użyć ponownie.
 pub const PASSWORD_HISTORY_LEN: usize = 3;
 
 const ONE_TIME_EXPIRY: &str = "time::now() + duration::from::hours(settings:main.one_time_valid_hours)";
 
-/// Rekord settings:main.
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
     pub min_length: usize,
@@ -28,15 +25,12 @@ pub async fn connect(cfg: &Config) -> Result<Db, Box<dyn std::error::Error>> {
     db.signin(Root { username: &cfg.db_user, password: &cfg.db_pass }).await?;
     db.use_ns("app").use_db("app").await?;
 
-    // schemat wykonuje się przy każdym starcie
     db.query(include_str!("schema.surql")).await?.check()?;
 
-    // settings:main z wartościami domyślnymi ze schematu, jeśli jeszcze nie istnieje
     db.query("INSERT IGNORE INTO settings { id: settings:main }").await?.check()?;
     Ok(db)
 }
 
-/// Zakłada konto z hasłem jednorazowym i zwraca termin jego ważności.
 pub async fn create_user(db: &Db, username: &str, role: Role, password_hash: String) -> surrealdb::Result<String> {
     let expires_at: Option<String> = db
         .query(format!(
@@ -52,8 +46,6 @@ pub async fn create_user(db: &Db, username: &str, role: Role, password_hash: Str
     Ok(expires_at.unwrap_or_default())
 }
 
-/// Nadaje kontu nowe hasło jednorazowe i kończy wszystkie jego sesje.
-/// Zwraca termin ważności hasła albo None, gdy konta nie ma.
 pub async fn reset_password(db: &Db, username: &str, password_hash: String) -> surrealdb::Result<Option<String>> {
     #[derive(Deserialize)]
     struct Updated { id: RecordId, expires_at: String }
@@ -86,8 +78,7 @@ pub async fn settings(db: &Db) -> Result<Settings, AppError> {
     settings.ok_or(AppError::Internal)
 }
 
-/// Zakłada konto ADMIN, jeśli go nie ma. Gdy jego hasło jednorazowe wygasło przed pierwszym logowaniem,
-/// nadaje nowe - inaczej nikt nie mógłby się już zalogować jako administrator.
+// jeśli hasło jednorazowe admina wygasło przed pierwszym logowaniem, dostaje nowe
 pub async fn ensure_admin(db: &Db) -> Result<(), Box<dyn std::error::Error>> {
     let otp_expired: Option<bool> = db
         .query("SELECT VALUE otp_expired FROM ONLY user WHERE username = $username LIMIT 1")
@@ -108,7 +99,6 @@ pub async fn ensure_admin(db: &Db) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Zakłada (lub przywraca do stanu początkowego) konta testowe ze skryptu seed.surql.
 pub async fn seed(db: &Db) -> surrealdb::Result<()> {
     db.query(include_str!("seed.surql")).await?.check()?;
     Ok(())

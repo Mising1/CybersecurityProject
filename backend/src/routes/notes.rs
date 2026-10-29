@@ -14,7 +14,6 @@ pub fn router() -> Router<AppState> {
 #[derive(Serialize, Deserialize)]
 struct Note { id: String, text: String, author: Option<String>, approved: bool, approved_by: Option<String> }
 
-/// Czytelnik widzi tylko notatki zatwierdzone, redaktor i kierownik także szkice.
 async fn list(State(state): State<AppState>, user: CurrentUser) -> Result<Json<Vec<Note>>, AppError> {
     user.require(Permission::ReadContent)?;
     let sees_drafts = user.role.has(Permission::EditContent) || user.role.has(Permission::ApproveContent);
@@ -55,7 +54,6 @@ async fn add(
     Ok(StatusCode::CREATED)
 }
 
-/// Zmieniona notatka wraca do szkiców i musi zostać ponownie zatwierdzona.
 async fn edit(
     State(state): State<AppState>,
     user: CurrentUser,

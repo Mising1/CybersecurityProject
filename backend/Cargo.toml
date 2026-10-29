@@ -16,7 +16,7 @@ sha2 = "0.10"
 hex = "0.4"
 axum-extra = { version = "0.9", features = ["cookie"] }
 chrono = { version = "0.4", features = ["serde"] }
-# Argon2 bez optymalizacji liczy hash ~1 s; w trybie dev optymalizujemy tylko te crate'y
+# argon2 bez optymalizacji jest w debugu bardzo wolny
 [profile.dev.package.argon2]
 opt-level = 3
 

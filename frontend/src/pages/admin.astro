@@ -120,7 +120,6 @@ import Layout from "../layouts/Layout.astro";
     (e.target as HTMLButtonElement).textContent = "Skopiowano";
   });
 
-  /** Pokazuje błąd akcji (jeśli był) i odświeża listę. */
   async function userAction(res: Response): Promise<Response> {
     errorBox.textContent = "";
     if (!res.ok) errorBox.textContent = await errorMessage(res);
@@ -158,7 +157,6 @@ import Layout from "../layouts/Layout.astro";
     body.replaceChildren();
     for (const u of users) {
       const path = `/admin/users/${encodeURIComponent(u.username)}`;
-      // własnego konta i konta ADMIN nie można blokować, usuwać ani zmieniać mu roli
       const protectedAccount = u.username === me.username || u.username === ADMIN_USERNAME;
       const row = body.insertRow();
 

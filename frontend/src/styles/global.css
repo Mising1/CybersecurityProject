@@ -1,4 +1,3 @@
-/* Minimalizm: neutralne tło, czarny jako kolor akcji, jeden akcent (pomarańcz) używany oszczędnie. */
 :root {
   --bg: #f7f7f5;
   --surface: #ffffff;
@@ -187,7 +186,6 @@ input:not([type="checkbox"]):focus, select:focus, textarea:focus {
 select:disabled { opacity: 0.5; cursor: not-allowed; }
 textarea { height: auto; padding: 10px 12px; resize: vertical; min-height: 84px; }
 
-/* przełącznik zamiast zwykłego checkboxa */
 .switch {
   display: flex;
   align-items: center;

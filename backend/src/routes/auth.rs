@@ -55,19 +55,17 @@ async fn login(
         .await?
         .take(0)?;
 
-    // hasło jest weryfikowane zawsze, także dla nieistniejącego loginu (patrz DUMMY_HASH)
     let hash = user.as_ref().map_or_else(|| security::DUMMY_HASH.clone(), |u| u.password_hash.clone());
     let valid = tokio::task::spawn_blocking(move || security::verify_password(&req.password, &hash)).await?;
     let user = match user {
         Some(u) if valid && !u.blocked => u,
         _ => return Err(AppError::InvalidCredentials),
     };
-    // to już nic nie zdradza - hasło było poprawne
     if user.otp_expired {
         return Err(AppError::OneTimePasswordExpired);
     }
 
-    // poprzednia sesja z tej przeglądarki przestaje obowiązywać, a nowa dostaje nowy token (ochrona przed session fixation)
+    // nowy token po zalogowaniu (session fixation)
     if let Some(old) = jar.get(SESSION_COOKIE) {
         auth::delete_session(&state.db, old.value()).await?;
     }
@@ -96,7 +94,6 @@ struct Me {
     role: Role,
     permissions: Vec<Permission>,
     must_change_password: bool,
-    /// frontend wylogowuje po tym czasie bez zapytań do API - tak samo liczy go serwer
     idle_timeout_minutes: u32,
 }
 
@@ -128,7 +125,6 @@ async fn change_password(
     let current = req.current_password.clone();
     let current_hash = creds.password_hash.clone();
     let valid = tokio::task::spawn_blocking(move || security::verify_password(&current, &current_hash)).await?;
-    // 400, a nie 401 - błędne obecne hasło nie kończy sesji
     if !valid {
         return Err(AppError::BadRequest("Obecne hasło jest niepoprawne."));
     }
@@ -137,7 +133,6 @@ async fn change_password(
     }
     db::password_policy(&state.db).await?.check(&req.new_password).map_err(AppError::BadRequest)?;
 
-    // obecne hasło (także jednorazowe) i ostatnie hasła ustawione przez użytkownika
     let mut previous = creds.password_history;
     if !previous.contains(&creds.password_hash) {
         previous.push(creds.password_hash);
@@ -157,7 +152,7 @@ async fn change_password(
              password_changed_at = time::now(), \
              password_history = array::slice(array::prepend(password_history, $hash), 0, $history_len)",
         )
-        .query("DELETE session WHERE user = $id AND id != $current_session")  // pozostałe sesje tracą ważność
+        .query("DELETE session WHERE user = $id AND id != $current_session")
         .bind(("id", user.id))
         .bind(("hash", hash))
         .bind(("current_session", user.session_id))

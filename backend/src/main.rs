@@ -34,11 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Utworzono konta testowe (src/seed.surql)");
         return Ok(());
     }
-    // liczony od razu, a nie przy pierwszym logowaniu - inaczej to jedno logowanie trwałoby dłużej
+    // liczymy od razu, żeby pierwsze logowanie nie trwało dłużej niż kolejne
     std::sync::LazyLock::force(&security::DUMMY_HASH);
     tokio::spawn(auth::purge_expired_sessions(db.clone()));
 
-    // frontend woła API przez proxy /api (ten sam origin), więc CORS nie jest potrzebny
     let app = Router::new()
         .merge(routes::auth::router())
         .merge(routes::admin::router())

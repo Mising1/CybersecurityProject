@@ -7,7 +7,7 @@ pub enum Role { Administrator, Kierownik, Redaktor, Czytelnik }
 #[derive(Clone, Copy, PartialEq, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Permission {
-    ManageUsers, ManageSettings,      // panel administratora
+    ManageUsers, ManageSettings,
     ReadContent, EditContent, ApproveContent,
 }
 
@@ -17,7 +17,6 @@ impl Permission {
 }
 
 impl Role {
-    /// Jedyne miejsce, w którym role dostają uprawnienia - kod sprawdza uprawnienia, nigdy role.
     pub fn has(self, p: Permission) -> bool {
         use Permission::*;
         match self {

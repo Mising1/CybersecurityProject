@@ -5,7 +5,6 @@ pub struct Config {
     pub db_user: String,
     pub db_pass: String,
     pub bind_addr: String,
-    /// true na produkcji (HTTPS) - ciasteczko sesji dostaje flagę Secure
     pub cookie_secure: bool,
 }
 

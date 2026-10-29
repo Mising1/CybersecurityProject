@@ -37,7 +37,7 @@ import Layout from "../layouts/Layout.astro";
   renderHeader(me);
   const errorBox = document.getElementById("error")!;
 
-  // ukrywanie elementów to tylko wygoda - o dostępie decyduje backend
+  // to tylko UI, uprawnienia sprawdza backend
   const canEdit = me.permissions.includes("edit_content");
   const canApprove = me.permissions.includes("approve_content");
 
@@ -67,7 +67,6 @@ import Layout from "../layouts/Layout.astro";
     return b;
   }
 
-  /** Zamienia treść notatki na pole edycji w tym samym miejscu. */
   function startEditing(li: HTMLLIElement, note: Note) {
     const area = el("textarea");
     area.value = note.text;
