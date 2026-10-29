@@ -1,0 +1,51 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  /** false na stronie logowania - bez paska górnego, formularz na środku */
+  nav?: boolean;
+  narrow?: boolean;
+}
+
+const { title, nav = true, narrow = false } = Astro.props;
+const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+const links = [
+  { href: "/", label: "Notatki" },
+  { href: "/admin", label: "Administracja", id: "admin-link" },
+  { href: "/password", label: "Hasło" },
+];
+---
+
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} · Notatki</title>
+  </head>
+  <body class:list={{ auth: !nav }}>
+    {nav && (
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="/">Notatki<span>.</span></a>
+          <nav id="main-nav">
+            {links.map((l) => (
+              <a href={l.href} id={l.id} hidden={l.id === "admin-link"} aria-current={path === l.href ? "page" : undefined}>
+                {l.label}
+              </a>
+            ))}
+          </nav>
+          <div class="user">
+            <span id="who"></span>
+            <button id="logout" class="btn ghost small">Wyloguj</button>
+          </div>
+        </div>
+      </header>
+    )}
+    <main class:list={["page", { narrow }]}>
+      <slot />
+    </main>
+  </body>
+</html>

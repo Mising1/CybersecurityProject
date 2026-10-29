@@ -1,0 +1,6 @@
+services:
+  db:
+    image: docker.io/surrealdb/surrealdb:v2.3.7
+    command: start --bind 0.0.0.0:8000 --user root --pass root rocksdb:/data/db
+    ports: ["8000:8000"]
+    volumes: ["./data:/data"]

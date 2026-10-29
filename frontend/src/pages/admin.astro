@@ -1,0 +1,254 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Administracja">
+  <div class="page-head">
+    <span class="eyebrow">Administracja</span>
+    <h1>Użytkownicy i ustawienia</h1>
+  </div>
+
+  <p id="error" class="alert" role="alert"></p>
+
+  <div id="one-time" class="secret" hidden>
+    <span id="one-time-label"></span>
+    <div class="secret-value">
+      <code id="one-time-value"></code>
+      <button id="copy" class="btn ghost small" type="button">Kopiuj</button>
+    </div>
+    <span class="muted small">Hasło jest pokazywane tylko raz. Przekaż je użytkownikowi bezpiecznym kanałem.</span>
+  </div>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Nowy użytkownik</h2>
+      <p>Konto dostanie hasło jednorazowe, które trzeba zmienić przy pierwszym logowaniu.</p>
+    </div>
+    <form id="create" class="form-row">
+      <label class="field">Login <input name="username" required /></label>
+      <label class="field">Rola <select name="role"></select></label>
+      <button class="btn">Utwórz konto</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Konta</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th>Login</th><th>Rola</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody id="users"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="settings" class="card" hidden>
+    <div class="card-head">
+      <h2>Bezpieczeństwo</h2>
+      <p>
+        Minimalna długość hasła: <span id="min-length"></span> znaków ·
+        ważność hasła jednorazowego: <span id="one-time-hours"></span> h
+      </p>
+    </div>
+    <form id="settings-form" class="form">
+      <label class="switch">
+        <input name="passphrase" type="checkbox" />
+        Wymagaj frazy hasłowej (co najmniej 3 słowa oddzielone spacją lub myślnikiem)
+      </label>
+      <div class="form-row">
+        <label class="field"><span>Ważność hasła <span class="hint">· dni</span></span>
+          <input name="valid_days" type="number" min="1" max="3650" required />
+        </label>
+        <label class="field"><span>Wylogowanie po bezczynności <span class="hint">· minuty</span></span>
+          <input name="idle_minutes" type="number" min="1" max="1440" required />
+        </label>
+      </div>
+      <div class="form-row">
+        <button class="btn">Zapisz ustawienia</button>
+        <span id="settings-saved" class="badge ok" hidden>Zapisano</span>
+      </div>
+    </form>
+  </section>
+</Layout>
+
+<script>
+  import { api, currentUser, errorMessage, formatDate, renderHeader } from "../lib/api";
+
+  const ADMIN_USERNAME = "ADMIN";
+  const ROLES = ["czytelnik", "redaktor", "kierownik", "administrator"];
+
+  type User = {
+    username: string;
+    role: string;
+    blocked: boolean;
+    must_change_password: boolean;
+    password_expired: boolean;
+  };
+  type Settings = {
+    min_length: number;
+    passphrase_rule_enabled: boolean;
+    password_valid_days: number;
+    idle_timeout_minutes: number;
+    one_time_valid_hours: number;
+  };
+
+  const errorBox = document.getElementById("error")!;
+
+  const me = await currentUser();
+  if (!me.permissions.includes("manage_users")) location.href = "/";
+  renderHeader(me);
+
+  function roleSelect(selected: string): HTMLSelectElement {
+    const select = document.createElement("select");
+    for (const role of ROLES) select.add(new Option(role, role, false, role === selected));
+    return select;
+  }
+  document.querySelector("#create select")!.replaceWith(Object.assign(roleSelect("czytelnik"), { name: "role" }));
+
+  function showOneTimePassword(r: { username: string; one_time_password: string; expires_at: string }) {
+    document.getElementById("one-time-label")!.textContent =
+      `Hasło jednorazowe dla ${r.username}, ważne do ${formatDate(r.expires_at)}`;
+    document.getElementById("one-time-value")!.textContent = r.one_time_password;
+    document.getElementById("one-time")!.hidden = false;
+    document.getElementById("one-time")!.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  document.getElementById("copy")!.addEventListener("click", async (e) => {
+    await navigator.clipboard.writeText(document.getElementById("one-time-value")!.textContent!);
+    (e.target as HTMLButtonElement).textContent = "Skopiowano";
+  });
+
+  /** Pokazuje błąd akcji (jeśli był) i odświeża listę. */
+  async function userAction(res: Response): Promise<Response> {
+    errorBox.textContent = "";
+    if (!res.ok) errorBox.textContent = await errorMessage(res);
+    await loadUsers();
+    return res;
+  }
+
+  function button(label: string, className: string, disabled: boolean, onClick: () => void): HTMLButtonElement {
+    const b = document.createElement("button");
+    b.className = `btn small ${className}`;
+    b.textContent = label;
+    b.disabled = disabled;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function badge(text: string, kind = ""): HTMLSpanElement {
+    const span = document.createElement("span");
+    span.className = `badge ${kind}`;
+    span.textContent = text;
+    return span;
+  }
+
+  function badges(u: User): HTMLSpanElement[] {
+    const list = [u.blocked ? badge("zablokowany", "danger") : badge("aktywny", "ok")];
+    if (u.must_change_password) list.push(badge("hasło jednorazowe", "warn"));
+    else if (u.password_expired) list.push(badge("hasło wygasło", "warn"));
+    if (u.username === ADMIN_USERNAME) list.push(badge("wbudowane"));
+    return list;
+  }
+
+  async function loadUsers() {
+    const users: User[] = await (await api("/admin/users")).json();
+    const body = document.getElementById("users")!;
+    body.replaceChildren();
+    for (const u of users) {
+      const path = `/admin/users/${encodeURIComponent(u.username)}`;
+      // własnego konta i konta ADMIN nie można blokować, usuwać ani zmieniać mu roli
+      const protectedAccount = u.username === me.username || u.username === ADMIN_USERNAME;
+      const row = body.insertRow();
+
+      const name = row.insertCell();
+      name.className = "username";
+      name.textContent = u.username;
+
+      const role = roleSelect(u.role);
+      role.disabled = protectedAccount;
+      role.addEventListener("change", () =>
+        api(path, { method: "PUT", body: JSON.stringify({ role: role.value }) }).then(userAction));
+      row.insertCell().append(role);
+
+      const status = row.insertCell();
+      const statusBox = document.createElement("div");
+      statusBox.className = "cell-badges";
+      statusBox.append(...badges(u));
+      status.append(statusBox);
+
+      const actions = document.createElement("div");
+      actions.className = "cell-actions";
+      actions.append(
+        button(u.blocked ? "Odblokuj" : "Zablokuj", "ghost", protectedAccount, () =>
+          api(`${path}/blocked`, { method: "PUT", body: JSON.stringify({ blocked: !u.blocked }) }).then(userAction)),
+        button("Resetuj hasło", "ghost", u.username === me.username, async () => {
+          if (!confirm(`Nadać ${u.username} nowe hasło jednorazowe? Jego sesje zostaną zakończone.`)) return;
+          const res = await userAction(await api(`${path}/password`, { method: "POST" }));
+          if (res.ok) showOneTimePassword(await res.json());
+        }),
+        button("Usuń", "danger", protectedAccount, async () => {
+          if (!confirm(`Usunąć konto ${u.username}? Tej operacji nie można cofnąć.`)) return;
+          await userAction(await api(path, { method: "DELETE" }));
+        }),
+      );
+      row.insertCell().append(actions);
+    }
+  }
+
+  document.getElementById("create")!.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const data = new FormData(form);
+    const res = await api("/admin/users", {
+      method: "POST",
+      body: JSON.stringify({ username: data.get("username"), role: data.get("role") }),
+    });
+    errorBox.textContent = "";
+    if (!res.ok) {
+      errorBox.textContent = await errorMessage(res);
+      return;
+    }
+    showOneTimePassword(await res.json());
+    form.reset();
+    await loadUsers();
+  });
+
+  const settingsForm = document.getElementById("settings-form") as HTMLFormElement;
+  const field = (name: string) => settingsForm.elements.namedItem(name) as HTMLInputElement;
+
+  function showSettings(s: Settings) {
+    document.getElementById("min-length")!.textContent = String(s.min_length);
+    document.getElementById("one-time-hours")!.textContent = String(s.one_time_valid_hours);
+    field("passphrase").checked = s.passphrase_rule_enabled;
+    field("valid_days").value = String(s.password_valid_days);
+    field("idle_minutes").value = String(s.idle_timeout_minutes);
+  }
+
+  if (me.permissions.includes("manage_settings")) {
+    document.getElementById("settings")!.hidden = false;
+    showSettings(await (await api("/admin/settings")).json());
+    settingsForm.addEventListener("input", () => (document.getElementById("settings-saved")!.hidden = true));
+    settingsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const res = await api("/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          passphrase_rule_enabled: field("passphrase").checked,
+          password_valid_days: Number(field("valid_days").value),
+          idle_timeout_minutes: Number(field("idle_minutes").value),
+        }),
+      });
+      errorBox.textContent = "";
+      if (res.ok) {
+        showSettings(await res.json());
+        document.getElementById("settings-saved")!.hidden = false;
+      } else {
+        errorBox.textContent = await errorMessage(res);
+      }
+    });
+  }
+
+  await loadUsers();
+</script>

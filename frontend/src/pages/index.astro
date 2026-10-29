@@ -1,0 +1,121 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Notatki">
+  <div class="page-head">
+    <span class="eyebrow">Treści</span>
+    <h1>Notatki</h1>
+    <p id="lead" class="lead"></p>
+  </div>
+
+  <p id="no-access" class="alert info" hidden>Twoja rola nie ma dostępu do treści.</p>
+  <p id="error" class="alert" role="alert"></p>
+
+  <section id="new-note" class="card" hidden>
+    <div class="card-head">
+      <h2>Nowa notatka</h2>
+      <p>Trafi do szkiców i będzie widoczna dla czytelników po zatwierdzeniu.</p>
+    </div>
+    <form id="f" class="form">
+      <textarea name="text" required placeholder="Treść notatki"></textarea>
+      <div><button class="btn">Dodaj szkic</button></div>
+    </form>
+  </section>
+
+  <section id="notes-card" class="card" hidden>
+    <ul id="notes" class="notes"></ul>
+  </section>
+</Layout>
+
+<script>
+  import { api, currentUser, errorMessage, renderHeader } from "../lib/api";
+
+  type Note = { id: string; text: string; author: string | null; approved: boolean; approved_by: string | null };
+
+  const me = await currentUser();
+  renderHeader(me);
+  const errorBox = document.getElementById("error")!;
+
+  // ukrywanie elementów to tylko wygoda - o dostępie decyduje backend
+  const canEdit = me.permissions.includes("edit_content");
+  const canApprove = me.permissions.includes("approve_content");
+
+  document.getElementById("lead")!.textContent = canApprove
+    ? "Przeglądaj, edytuj i zatwierdzaj notatki."
+    : canEdit
+      ? "Twórz i edytuj notatki. Kierownik zatwierdza je do publikacji."
+      : "Zatwierdzone notatki zespołu.";
+
+  async function send(path: string, init: RequestInit) {
+    const res = await api(path, init);
+    if (res.ok) location.reload();
+    else errorBox.textContent = await errorMessage(res);
+  }
+
+  function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
+    const e = document.createElement(tag);
+    e.className = className;
+    e.textContent = text;
+    return e;
+  }
+
+  function button(label: string, className: string, onClick: () => void): HTMLButtonElement {
+    const b = el("button", `btn small ${className}`, label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  /** Zamienia treść notatki na pole edycji w tym samym miejscu. */
+  function startEditing(li: HTMLLIElement, note: Note) {
+    const area = el("textarea");
+    area.value = note.text;
+    const actions = el("div", "note-actions");
+    actions.append(
+      button("Anuluj", "ghost", () => location.reload()),
+      button("Zapisz", "", () => send(`/notes/${note.id}`, { method: "PUT", body: JSON.stringify({ text: area.value }) })),
+    );
+    const meta = el("div", "note-meta", "Po zapisaniu notatka wróci do szkiców.");
+    meta.append(actions);
+    li.replaceChildren(area, meta);
+    area.focus();
+  }
+
+  function renderNote(note: Note): HTMLLIElement {
+    const li = el("li", "note");
+    const meta = el("div", "note-meta");
+    meta.append(
+      el("span", "", note.author ?? "autor nieznany"),
+      note.approved
+        ? el("span", "badge ok", `zatwierdzona · ${note.approved_by}`)
+        : el("span", "badge warn", "szkic"),
+    );
+    const actions = el("div", "note-actions");
+    if (canEdit) actions.append(button("Edytuj", "ghost", () => startEditing(li, note)));
+    if (canApprove && !note.approved) {
+      actions.append(button("Zatwierdź", "", () => send(`/notes/${note.id}/approve`, { method: "POST" })));
+    }
+    meta.append(actions);
+    li.append(el("p", "note-text", note.text), meta);
+    return li;
+  }
+
+  if (me.permissions.includes("read_content")) {
+    const notes: Note[] = await (await api("/notes")).json();
+    const list = document.getElementById("notes")!;
+    list.append(...notes.map(renderNote));
+    if (!notes.length) list.append(el("li", "empty", "Brak notatek."));
+    document.getElementById("notes-card")!.hidden = false;
+  } else {
+    document.getElementById("no-access")!.hidden = false;
+  }
+
+  const form = document.getElementById("f") as HTMLFormElement;
+  document.getElementById("new-note")!.hidden = !canEdit;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = new FormData(form).get("text");
+    send("/notes", { method: "POST", body: JSON.stringify({ text }) });
+  });
+</script>

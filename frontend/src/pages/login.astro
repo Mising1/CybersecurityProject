@@ -1,0 +1,42 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Logowanie" nav={false} narrow>
+  <div class="page-head">
+    <span class="brand auth-brand">Notatki<span>.</span></span>
+  </div>
+
+  <section class="card">
+    <div class="card-head">
+      <h1>Zaloguj się</h1>
+      <p>Użyj loginu i hasła otrzymanego od administratora.</p>
+    </div>
+    <p id="idle" class="alert info" hidden>Sesja wygasła z powodu bezczynności. Zaloguj się ponownie.</p>
+    <form id="login" class="form">
+      <label class="field">Login <input name="username" autocomplete="username" required autofocus /></label>
+      <label class="field">Hasło <input name="password" type="password" autocomplete="current-password" required /></label>
+      <p id="error" class="alert" role="alert"></p>
+      <button class="btn block">Zaloguj</button>
+    </form>
+  </section>
+</Layout>
+
+<script>
+  import { api, errorMessage } from "../lib/api";
+
+  document.getElementById("idle")!.hidden = !new URLSearchParams(location.search).has("idle");
+
+  document.getElementById("login")!.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target as HTMLFormElement);
+    const res = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username: form.get("username"), password: form.get("password") }),
+    });
+    if (res.ok) {
+      const { must_change_password } = await res.json();
+      location.href = must_change_password ? "/password" : "/";
+    } else document.getElementById("error")!.textContent = await errorMessage(res);
+  });
+</script>

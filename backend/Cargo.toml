@@ -1,0 +1,24 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+surrealdb = { version = "~2.3", features = ["protocol-http"] }
+tower-http = { version = "0.5", features = ["cors"] }
+argon2 = "0.5"
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+axum-extra = { version = "0.9", features = ["cookie"] }
+chrono = { version = "0.4", features = ["serde"] }
+# Argon2 bez optymalizacji liczy hash ~1 s; w trybie dev optymalizujemy tylko te crate'y
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

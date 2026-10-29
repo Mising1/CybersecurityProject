@@ -1,0 +1,35 @@
+# Rust (backend)
+target/
+**/*.rs.bk
+
+# Astro / Node (frontend)
+node_modules/
+dist/
+.astro/
+.vercel/
+.netlify/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dane SurrealDB (wolumen z compose.yaml)
+data/
+
+# Sekrety i konfiguracja lokalna
+.env
+.env.*
+!.env.example
+
+# Edytory i system
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Pliki prywatne
+ocena.txt
+RAPORT_*.md
+zadanie.txt
+Moduł 1 - *.pdf
